@@ -9,6 +9,20 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.pagesizes import A4
 
+
+# ===============================
+# CONFIG
+# ===============================
+
+HOURS = 24
+MAX_PER_COMPANY = 8
+PDF_NAME = "LNG_Daily_Newsletter.pdf"
+
+
+# ===============================
+# COMPANY UNIVERSE
+# ===============================
+
 COMPANIES = {
     "GTT": {
         "keywords": ["GTT", "Gaztransport", "Technigaz", "Gaztransport & Technigaz"],
@@ -19,70 +33,71 @@ COMPANIES = {
         "strict": ["Flex LNG", "FLNG"]
     },
     "Capital Clean Energy Carriers Corp.": {
-        # keep keywords if you want, but STRICT is what will decide what stays
         "keywords": ["Capital Clean Energy Carriers", "Capital Clean Energy Carriers Corp.", "CCEC"],
-        # THIS is the key: remove broad stuff like "Capital Clean Energy"
         "strict": ["Capital Clean Energy Carriers", "CCEC"]
     },
     "Nakilat": {
         "keywords": ["Nakilat", "Qatar Gas Transport", "QGTS"],
         "strict": ["Nakilat", "QGTS"]
     },
-    "Hyundai Heavy Industries (HHI)": {
-        "keywords": ["Hyundai Heavy Industries", "HHI"],
-        "strict": ["Hyundai Heavy Industries"]  # avoid noisy acronym
+    "Hyundai Heavy Industries": {
+        "keywords": ["Hyundai Heavy Industries"],
+        "strict": ["Hyundai Heavy Industries"]
     },
     "Hanwha Ocean": {
         "keywords": ["Hanwha Ocean", "DSME", "Daewoo Shipbuilding"],
-        "strict": ["Hanwha Ocean", "Daewoo Shipbuilding", "DSME"]
+        "strict": ["Hanwha Ocean", "DSME", "Daewoo Shipbuilding"]
     },
-    "Samsung Heavy Industries (SHI)": {
-        "keywords": ["Samsung Heavy Industries", "SHI"],
-        "strict": ["Samsung Heavy Industries"]  # avoid noisy acronym
+    "Samsung Heavy Industries": {
+        "keywords": ["Samsung Heavy Industries"],
+        "strict": ["Samsung Heavy Industries"]
     },
     "MOL": {
-        "keywords": ["Mitsui O.S.K.", "Mitsui O.S.K. Lines", "MOL"],
-        "strict": ["Mitsui O.S.K.", "Mitsui O.S.K. Lines"]  # avoid noisy acronym
+        "keywords": ["Mitsui O.S.K. Lines", "Mitsui O.S.K."],
+        "strict": ["Mitsui O.S.K."]
     },
     "NYK": {
-        "keywords": ["NYK", "Nippon Yusen", "Nippon Yusen Kaisha"],
-        "strict": ["Nippon Yusen", "Nippon Yusen Kaisha"]  # avoid noisy acronym
+        "keywords": ["Nippon Yusen", "Nippon Yusen Kaisha"],
+        "strict": ["Nippon Yusen"]
     },
     "Maran Gas": {
         "keywords": ["Maran Gas", "Maran Gas Maritime"],
         "strict": ["Maran Gas"]
     },
     "Seapeak Maritime": {
-        "keywords": ["Seapeak", "Seapeak Maritime"],
+        "keywords": ["Seapeak Maritime", "Seapeak"],
         "strict": ["Seapeak"]
     },
     "GasLog": {
-        "keywords": ["GasLog", "GasLog Partners LP", "GLOP-PA"],
-        "strict": ["GasLog", "GLOP"]  # keep it broad-ish but still specific
+        "keywords": ["GasLog", "GasLog Partners"],
+        "strict": ["GasLog"]
     },
     "Hyundai Samho Heavy Industries": {
-        "keywords": ["Hyundai Samho", "Hyundai Samho Heavy Industries"],
+        "keywords": ["Hyundai Samho Heavy Industries"],
         "strict": ["Hyundai Samho"]
     },
     "Hudong-Zhonghua": {
-        "keywords": ["Hudong-Zhonghua", "Hudong Zhonghua", "Hudong-Zhonghua Shipbuilding"],
+        "keywords": ["Hudong-Zhonghua", "Hudong Zhonghua"],
         "strict": ["Hudong-Zhonghua", "Hudong Zhonghua"]
     }
 }
 
 
-def passes_strict_filter(article_title, strict_keywords):
-    if not strict_keywords:
+# ===============================
+# HELPERS
+# ===============================
+
+def passes_strict_filter(title, strict_keywords):
+    if strict_keywords is None:
         return True
-    t = article_title.lower()
-    return any(sk.lower() in t for sk in strict_keywords)
+    t = title.lower()
+    for sk in strict_keywords:
+        if sk.lower() in t:
+            return True
+    return False
 
 
-
-    def fetch_google_news(keywords, hours=24, hl="en-US", gl="US", ceid="US:en"):
-    """
-    Pulls Google News RSS items for each keyword and keeps only items with published date >= now-<hours>.
-    """
+def fetch_google_news(keywords, hours):
     cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
     articles = []
 
@@ -90,12 +105,12 @@ def passes_strict_filter(article_title, strict_keywords):
         kw_encoded = quote_plus(kw)
         rss_url = (
             "https://news.google.com/rss/search?"
-            f"q={kw_encoded}+when:{hours}h&hl={hl}&gl={gl}&ceid={ceid}"
+            f"q={kw_encoded}+when:{hours}h&hl=en-US&gl=US&ceid=US:en"
         )
 
         feed = feedparser.parse(rss_url)
 
-        for entry in getattr(feed, "entries", []):
+        for entry in feed.entries:
             if not hasattr(entry, "published_parsed") or entry.published_parsed is None:
                 continue
 
@@ -104,7 +119,7 @@ def passes_strict_filter(article_title, strict_keywords):
                 continue
 
             source = "Google News"
-            if hasattr(entry, "source") and entry.source and hasattr(entry.source, "title"):
+            if hasattr(entry, "source") and hasattr(entry.source, "title"):
                 source = entry.source.title
 
             articles.append({
@@ -118,55 +133,94 @@ def passes_strict_filter(article_title, strict_keywords):
     return articles
 
 
+def build_newsletter():
+    newsletter = {}
 
+    for company, cfg in COMPANIES.items():
+        raw = fetch_google_news(cfg["keywords"], HOURS)
 
-def build_newsletter(companies_dict, hours=24, max_per_company=8):
-    newsletter_data = {}
+        filtered = []
+        for a in raw:
+            if passes_strict_filter(a["title"], cfg["strict"]):
+                filtered.append(a)
 
-    for company, config in companies_dict.items():
-        keywords = config["keywords"]
-        strict = config.get("strict")
-
-        raw = fetch_google_news(keywords, hours=hours)
-
-        # Apply strict title filter (this is what kills the random macro articles)
-        filtered = [a for a in raw if passes_strict_filter(a["title"], strict)]
-
-        # dedupe across keywords by (title, link)
-        unique = {}
+        deduped = {}
         for a in filtered:
             key = (a["title"], a["link"])
-            if key not in unique or a["published_dt"] > unique[key]["published_dt"]:
-                unique[key] = a
+            if key not in deduped or a["published_dt"] > deduped[key]["published_dt"]:
+                deduped[key] = a
 
-        articles = sorted(unique.values(), key=lambda x: x["published_dt"], reverse=True)
-        newsletter_data[company] = articles[:max_per_company]
+        sorted_articles = sorted(
+            deduped.values(),
+            key=lambda x: x["published_dt"],
+            reverse=True
+        )
 
-    return newsletter_data
+        newsletter[company] = sorted_articles[:MAX_PER_COMPANY]
+
+    return newsletter
 
 
+# ===============================
+# PDF
+# ===============================
+
+def generate_pdf(newsletter_data):
+    styles = getSampleStyleSheet()
+    doc = SimpleDocTemplate(PDF_NAME, pagesize=A4)
+    content = []
+
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    total_items = sum(len(v) for v in newsletter_data.values())
+
+    content.append(Paragraph("<b>LNG & Shipping – Daily Newsletter</b>", styles["Title"]))
+    content.append(Spacer(1, 8))
+    content.append(Paragraph(f"{today} · Last {HOURS}h · {total_items} articles", styles["Normal"]))
+    content.append(Spacer(1, 16))
+
+    for company, articles in newsletter_data.items():
+        content.append(Paragraph(company, styles["Heading2"]))
+        content.append(Spacer(1, 8))
+
+        if not articles:
+            content.append(Paragraph("No relevant news.", styles["Normal"]))
+            content.append(Spacer(1, 10))
+            continue
+
+        for a in articles:
+            text = (
+                f"<b>{a['title']}</b><br/>"
+                f"{a['source']} – {a['published']}<br/>"
+                f"<a href='{a['link']}'>Open article</a>"
+            )
+            content.append(Paragraph(text, styles["Normal"]))
+            content.append(Spacer(1, 10))
+
+    doc.build(content)
 
 
-def send_email_with_pdf(pdf_path: str, subject: str, body: str):
+# ===============================
+# EMAIL
+# ===============================
+
+def send_email_with_pdf():
     outlook_user = os.environ["OUTLOOK_USER"]
     outlook_password = os.environ["OUTLOOK_PASSWORD"]
     to_email = os.environ["TO_EMAIL"]
 
     msg = EmailMessage()
-    msg["Subject"] = subject
+    msg["Subject"] = f"LNG Daily Newsletter – {datetime.now(timezone.utc).strftime('%Y-%m-%d')}"
     msg["From"] = outlook_user
     msg["To"] = to_email
-    msg.set_content(body)
+    msg.set_content("Attached: LNG & Shipping daily newsletter (last 24 hours).")
 
-    with open(pdf_path, "rb") as f:
-        pdf_bytes = f.read()
-
-    msg.add_attachment(
-        pdf_bytes,
-        maintype="application",
-        subtype="pdf",
-        filename=os.path.basename(pdf_path),
-    )
+    with open(PDF_NAME, "rb") as f:
+        msg.add_attachment(
+            f.read(),
+            maintype="application",
+            subtype="pdf",
+            filename=PDF_NAME
+        )
 
     with smtplib.SMTP("smtp.office365.com", 587) as smtp:
         smtp.starttls()
@@ -174,73 +228,15 @@ def send_email_with_pdf(pdf_path: str, subject: str, body: str):
         smtp.send_message(msg)
 
 
+# ===============================
+# MAIN
+# ===============================
 
+if __name__ == "__main__":
+    data = build_newsletter()
+    generate_pdf(data)
+    send_email_with_pdf()
 
-        
-
-
-def generate_pdf(newsletter_data, filename="LNG_Daily_Newsletter.pdf", hours=24):
-    styles = getSampleStyleSheet()
-    doc = SimpleDocTemplate(filename, pagesize=A4)
-
-    content = []
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-
-    content.append(Paragraph(f"<b>LNG & Shipping – Daily Newsletter (Last {hours}h)</b>", styles["Title"]))
-    content.append(Spacer(1, 8))
-    content.append(Paragraph(today, styles["Normal"]))
-    content.append(Spacer(1, 16))
-
-    # quick index / overview
-    total_articles = sum(len(v) for v in newsletter_data.values())
-    content.append(Paragraph(f"Companies covered: {len(newsletter_data)} | Total items: {total_articles}", styles["Normal"]))
-    content.append(Spacer(1, 16))
-
-    for idx, (company, articles) in enumerate(newsletter_data.items(), start=1):
-        content.append(Paragraph(company, styles["Heading2"]))
-        content.append(Spacer(1, 8))
-
-        if not articles:
-            content.append(Paragraph("No relevant news in the last period.", styles["Normal"]))
-            content.append(Spacer(1, 10))
-        else:
-            for a in articles:
-                # Keep it simple and readable
-                text = (
-                    f"<b>{a['title']}</b><br/>"
-                    f"{a['source']} – {a['published']}<br/>"
-                    f"<a href='{a['link']}'>Open article</a>"
-                )
-                content.append(Paragraph(text, styles["Normal"]))
-                content.append(Spacer(1, 10))
-
-        
-
-    doc.build(content)
-
-
-
-
-HOURS = 24
-MAX_PER_COMPANY = 8  # tweak: 5-10 is usually good
-
-newsletter_data = build_newsletter(COMPANIES, hours=HOURS, max_per_company=MAX_PER_COMPANY)
-
-# sanity check counts
-{c: len(v) for c, v in newsletter_data.items()}
-
-
-
-generate_pdf(newsletter_data, filename="LNG_Daily_Newsletter.pdf", hours=HOURS)
-
-pdf_name = "LNG_Daily_Newsletter.pdf"
-generate_pdf(newsletter_data, filename=pdf_name, hours=HOURS)
-
-send_email_with_pdf(
-    pdf_path=pdf_name,
-    subject=f"LNG Newsletter (last {HOURS}h)",
-    body="Attached: today's LNG & Shipping news (last 24 hours)."
-)
 
 
 
