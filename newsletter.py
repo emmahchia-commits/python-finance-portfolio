@@ -1,10 +1,9 @@
-!pip install feedparser reportlab
 import os
-import smtplib
-from email.message import EmailMessage
 import feedparser
-from datetime import datetime, timedelta, timezone
+import smtplib
 from urllib.parse import quote_plus
+from datetime import datetime, timedelta, timezone
+from email.message import EmailMessage
 
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
