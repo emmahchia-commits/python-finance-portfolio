@@ -203,30 +203,6 @@ def generate_pdf(newsletter_data):
 # EMAIL
 # ===============================
 
-def send_email_with_pdf():
-    outlook_user = os.environ["OUTLOOK_USER"]
-    outlook_password = os.environ["OUTLOOK_PASSWORD"]
-    to_email = os.environ["TO_EMAIL"]
-
-    msg = EmailMessage()
-    msg["Subject"] = f"LNG Daily Newsletter – {datetime.now(timezone.utc).strftime('%Y-%m-%d')}"
-    msg["From"] = outlook_user
-    msg["To"] = to_email
-    msg.set_content("Attached: LNG & Shipping daily newsletter (last 24 hours).")
-
-    with open(PDF_NAME, "rb") as f:
-        msg.add_attachment(
-            f.read(),
-            maintype="application",
-            subtype="pdf",
-            filename=PDF_NAME
-        )
-
-    with smtplib.SMTP("smtp.office365.com", 587) as smtp:
-        smtp.starttls()
-        smtp.login(outlook_user, outlook_password)
-        smtp.send_message(msg)
-
 
 # ===============================
 # MAIN
@@ -235,7 +211,7 @@ def send_email_with_pdf():
 if __name__ == "__main__":
     data = build_newsletter()
     generate_pdf(data)
-    send_email_with_pdf()
+    print(f"PDF generated: {PDF_NAME}")
 
 
 
