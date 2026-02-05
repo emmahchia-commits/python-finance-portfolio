@@ -2,7 +2,7 @@ name: Daily LNG PDF Newsletter
 
 on:
   schedule:
-    - cron: "0 6 * * *"   # 06:00 UTC = 07:00 Paris (CET, winter)
+    - cron: "0 5 * * *"   # 06:00 UTC = 07:00 Paris (CET, winter)
   workflow_dispatch:
 
 jobs:
