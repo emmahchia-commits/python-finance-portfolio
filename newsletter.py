@@ -26,7 +26,7 @@ PDF_NAME = "LNG_Daily_Newsletter.pdf"
 COMPANIES = {
     " GTT": {
     "keywords": ["Gaztransport", "Technigaz", "Gaztransport & Technigaz", "GTT"],
-    "strict": ["Gaztransport", "Technigaz", "Gaztransport & Technigaz"],
+    "strict": ["Gaztransport", "Technigaz", "Gaztransport & Technigaz", "GTT"],
     "allow_acronym": False
     },
     "Flex LNG": {
