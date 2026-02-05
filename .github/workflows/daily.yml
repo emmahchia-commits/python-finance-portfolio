@@ -1,8 +1,8 @@
-name: Daily LNG Newsletter
+name: Daily LNG PDF Newsletter
 
 on:
   schedule:
-    - cron: "0 6 * * *"   # 06:00 UTC
+    - cron: "0 6 * * *"   # 06:00 UTC = 07:00 Paris (CET, winter)
   workflow_dispatch:
 
 jobs:
@@ -19,9 +19,12 @@ jobs:
       - name: Install dependencies
         run: pip install feedparser reportlab
 
-      - name: Run newsletter
-        env:
-          OUTLOOK_USER: ${{ secrets.OUTLOOK_USER }}
-          OUTLOOK_PASSWORD: ${{ secrets.OUTLOOK_PASSWORD }}
-          TO_EMAIL: ${{ secrets.TO_EMAIL }}
+      - name: Generate PDF
         run: python newsletter.py
+
+      - name: Upload PDF artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: LNG_Daily_Newsletter
+          path: LNG_Daily_Newsletter.pdf
+          retention-days: 14
