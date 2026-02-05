@@ -24,9 +24,10 @@ PDF_NAME = "LNG_Daily_Newsletter.pdf"
 # ===============================
 
 COMPANIES = {
-    "GTT": {
-        "keywords": ["GTT", "Gaztransport", "Technigaz", "Gaztransport & Technigaz"],
-        "strict": None
+    " GTT": {
+    "keywords": ["Gaztransport", "Technigaz", "Gaztransport & Technigaz", "GTT"],
+    "strict": ["Gaztransport", "Technigaz", "Gaztransport & Technigaz"],
+    "allow_acronym": False
     },
     "Flex LNG": {
         "keywords": ["Flex LNG", "FLNG"],
@@ -40,25 +41,29 @@ COMPANIES = {
         "keywords": ["Nakilat", "Qatar Gas Transport", "QGTS"],
         "strict": ["Nakilat", "QGTS"]
     },
-    "Hyundai Heavy Industries": {
-        "keywords": ["Hyundai Heavy Industries"],
-        "strict": ["Hyundai Heavy Industries"]
+   "Hyundai Heavy Industries": {
+    "keywords": ["Hyundai Heavy Industries", "HHI"],
+    "strict": ["Hyundai Heavy Industries"],
+    "allow_acronym": False
     },
     "Hanwha Ocean": {
         "keywords": ["Hanwha Ocean", "DSME", "Daewoo Shipbuilding"],
         "strict": ["Hanwha Ocean", "DSME", "Daewoo Shipbuilding"]
     },
     "Samsung Heavy Industries": {
-        "keywords": ["Samsung Heavy Industries"],
-        "strict": ["Samsung Heavy Industries"]
+    "keywords": ["Samsung Heavy Industries", "SHI"],
+    "strict": ["Samsung Heavy Industries"],
+    "allow_acronym": False
     },
-    "MOL": {
-        "keywords": ["Mitsui O.S.K. Lines", "Mitsui O.S.K."],
-        "strict": ["Mitsui O.S.K."]
+   "MOL": {
+    "keywords": ["Mitsui O.S.K. Lines", "Mitsui O.S.K.", "MOL"],
+    "strict": ["Mitsui O.S.K.", "Mitsui O.S.K. Lines"],
+    "allow_acronym": False
     },
     "NYK": {
-        "keywords": ["Nippon Yusen", "Nippon Yusen Kaisha"],
-        "strict": ["Nippon Yusen"]
+    "keywords": ["Nippon Yusen", "Nippon Yusen Kaisha", "NYK"],
+    "strict": ["Nippon Yusen", "Nippon Yusen Kaisha"],
+    "allow_acronym": False
     },
     "Maran Gas": {
         "keywords": ["Maran Gas", "Maran Gas Maritime"],
@@ -88,13 +93,10 @@ COMPANIES = {
 # ===============================
 
 def passes_strict_filter(title, strict_keywords):
-    if strict_keywords is None:
+    if not strict_keywords:
         return True
     t = title.lower()
-    for sk in strict_keywords:
-        if sk.lower() in t:
-            return True
-    return False
+    return any(sk.lower() in t for sk in strict_keywords)
 
 
 def fetch_google_news(keywords, hours):
